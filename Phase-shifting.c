@@ -26,13 +26,13 @@
 #define DB_LHb   13 // before S1H on, 1--5 ns, 40 for asynchronous mode
 #define DB_HLb   8 // before S1L on, 1--5 ns, 18 tested in syn on 101219
 
-#define PS  37 //(PS+2)*5 ns = Phi_Hoff
-#define CompA_b 495 // CompA_b = PRD_No - (Phi_Hoff - Phi_Loff)/5ns; e.g., CompA_b = 500 - (100ns-75ns)/5ns = 495;
+
+#define CompA_b 490 // CompA_b = PRD_No - (Phi_Hoff - Phi_Loff)/5ns; e.g., CompA_b = 500 - (100ns-75ns)/5ns = 495;
 
 #define Pulse_No 50 // number of cycles in one cycle; 1s // NTB:34
-//PRD_No = 400, 9--30A, 17--60A, Asyn--Pulse_No_max = 11 tested.
-#define OneCyclePulse_No 99 // active pulse no:
+#define OneCyclePulse_No 50
 //
+
 // Globals
 //
 Uint32 EPwm1TimerIntCount;
@@ -43,7 +43,7 @@ Uint16 EPwm1_DB_Direction;
 Uint16 EPwm2_DB_Direction;
 Uint16 EPwm3_DB_Direction;
 Uint16 EPwm4_DB_Direction;
-
+Uint16 PS = 16;   // 85ns/5 = 17 - 1
 
 //
 // Function Prototypes
@@ -215,10 +215,6 @@ __interrupt void epwm1_isr(void)
         EPwm2Regs.DBFED.bit.DBFED = DB_HLb;
         EPwm2_DB_Direction = DB_UP;
     }
-    if (EPwm1TimerIntCount == OneCyclePulse_No)
-    {
-        EPwm1TimerIntCount = 0;
-    }
 
 
 
@@ -259,13 +255,14 @@ void InitEPwm1Example()
     //
     // Setup compare
     //
-    EPwm1Regs.CMPA.bit.CMPA = 30;
+    EPwm1Regs.CMPA.bit.CMPA = CompA_b;
+    EPwm1Regs.CMPB.bit.CMPB = CompA_b;
 
     //
     // Set actions
     //
-    EPwm1Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM1A on Zero
-    EPwm1Regs.AQCTLB.bit.CAD = AQ_SET;
+    EPwm1Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM1A on Zero
+    EPwm1Regs.AQCTLA.bit.CBD = AQ_CLEAR;
 
     //
     // Active Low PWMs - Setup Deadband
@@ -282,7 +279,7 @@ void InitEPwm1Example()
     //
     EPwm1Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;    // Select INT on Zero event
     EPwm1Regs.ETSEL.bit.INTEN = 1;               // Enable INT
-    EPwm1Regs.ETPS.bit.INTPRD = ET_1ST;          // Generate INT on 3rd event
+    EPwm1Regs.ETPS.bit.INTPRD = ET_3RD;          // Generate INT on 3rd event
 }
 
 //
@@ -290,29 +287,35 @@ void InitEPwm1Example()
 //
 void InitEPwm2Example()
 {
-    EPwm2Regs.TBPRD = PRD_No;                     // Set timer period
-    EPwm2Regs.TBPHS.bit.TBPHS = PS;               // Phase is 0
+    EPwm2Regs.TBPRD = PRD_No;                       // Set timer period
+    EPwm2Regs.TBPHS.bit.TBPHS = PS;           // Phase is 0
     EPwm2Regs.TBCTR = 0x0000;                     // Clear counter
+
     //
     // Setup TBCLK
     //
     EPwm2Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN; // Count up
     EPwm2Regs.TBCTL.bit.PHSEN = TB_ENABLE;        // Enable phase loading
-    EPwm2Regs.TBCTL.bit.SYNCOSEL = TB_SYNC_IN;    // sync flow-through
+    EPwm2Regs.TBCTL.bit.SYNCOSEL = TB_SYNC_IN; // sync flow-through
 
     EPwm2Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;       // Clock ratio to SYSCLKOUT
     EPwm2Regs.TBCTL.bit.CLKDIV = TB_DIV1;          // Slow just to observe on
+                                                   // the scope
 
+    //
     // Setup compare
     //
     EPwm2Regs.CMPA.bit.CMPA = CompA_b;
+    EPwm2Regs.CMPB.bit.CMPB = CompA_b+1;
 
     //
     // Set actions
     //
-    EPwm2Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM1A on Zero
-    EPwm2Regs.AQCTLB.bit.CAD = AQ_SET;
+    EPwm2Regs.AQCTLA.bit.CAU = AQ_SET;            // Set PWM2A on Zero
+    EPwm2Regs.AQCTLA.bit.CBD = AQ_CLEAR;
 
+    //EPwm2Regs.AQCTLB.bit.CAU = AQ_CLEAR;          // Set PWM2A on Zero
+    //EPwm2Regs.AQCTLB.bit.CAD = AQ_SET;
 
     //
     // Active Low complementary PWMs - setup the deadband
@@ -324,4 +327,11 @@ void InitEPwm2Example()
     EPwm2Regs.DBFED.bit.DBFED = DB_HLb;
     EPwm2_DB_Direction = DB_UP;
 
+    //
+    // Interrupt where we will modify the deadband
+    //
+    //EPwm2Regs.ETSEL.bit.INTSEL = ET_CTR_ZERO;     // Select INT on Zero event
+    //EPwm2Regs.ETSEL.bit.INTEN = 1;                // Enable INT
+    //EPwm2Regs.ETPS.bit.INTPRD = ET_3RD;           // Generate INT on 3rd event
 }
+
